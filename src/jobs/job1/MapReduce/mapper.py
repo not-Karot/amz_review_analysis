@@ -3,8 +3,6 @@
 import string
 import sys
 import re
-import time
-import csv
 from datetime import datetime
 
 CLEANR = re.compile('<.*?>')
@@ -27,16 +25,16 @@ for line in sys.stdin:
     year = datetime.utcfromtimestamp(int(time)).strftime('%Y')
     # remove html tag inside text
     text = cleanhtml(text)
-    # replace dot with withespace
+    # replace dot with whitespace
     text = text.replace(".", " ")
 
     # remove punctuation
     text = text.translate(str.maketrans('', '', string.punctuation))
-    # remove withespace
+    # remove whitespace
     text = re.sub(' +', ' ', text)
     text = text.strip()
 
-    # Estrai parole dal campo "Text" delle recensioni
+    # Estrae parole dal campo "Text" delle recensioni
     words = re.findall(r'\w{4,}', text.lower())
 
     for word in words:

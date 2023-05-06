@@ -9,7 +9,7 @@ from operator import itemgetter
 word_counts = defaultdict(lambda: defaultdict(Counter))
 review_counts = defaultdict(lambda: defaultdict(int))
 
-# Leggi i dati dal mapper
+# Legge i dati dal mapper
 for line in sys.stdin:
     line = line.strip()
     key, word, count = line.split('\t')
