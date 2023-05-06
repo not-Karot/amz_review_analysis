@@ -1,35 +1,33 @@
 #!/usr/bin/env python
+"""reducer.py"""
 
 import sys
 from collections import defaultdict, Counter
+from operator import itemgetter
 
-current_key = None
-word_counts = defaultdict(int)
+# Strutture dati per memorizzare le parole e le recensioni per prodotto e anno
+word_counts = defaultdict(lambda: defaultdict(Counter))
+review_counts = defaultdict(lambda: defaultdict(int))
 
+# Leggi i dati dal mapper
 for line in sys.stdin:
     line = line.strip()
-
-    # Estrai chiave e valori dall'input
     key, word, count = line.split('\t')
+    year, product_id = key.split('-')
     count = int(count)
 
-    if key == current_key:
-        # Accumula il conteggio delle parole per la stessa chiave
-        word_counts[word] += count
-    else:
-        if current_key:
-            # Stampa le 5 parole più frequenti per la chiave corrente
-            top_words = Counter(word_counts).most_common(5)
-            for word, count in top_words:
-                print(f"{current_key}\t{word}\t{count}")
+    # Aggiorna il conteggio delle parole e delle recensioni per prodotto e anno
+    word_counts[year][product_id][word] += count
+    review_counts[year][product_id] += count
 
-        # Passa alla chiave successiva e resetta il conteggio delle parole
-        current_key = key
-        word_counts = defaultdict(int)
-        word_counts[word] = count
+# Trova i 10 prodotti più recensiti per ogni anno
+top_products = {}
+for year in review_counts:
+    top_products[year] = sorted(review_counts[year].items(), key=itemgetter(1), reverse=True)[:10]
 
-# Stampa le 5 parole più frequenti per l'ultima chiave
-if current_key:
-    top_words = Counter(word_counts).most_common(5)
-    for word, count in top_words:
-        print(f"{current_key}\t{word}\t{count}")
+# Calcola e stampa la frequenza delle parole per i 10 prodotti più recensiti per ogni anno
+for year in word_counts:
+    for product_id, word_count in word_counts[year].items():
+        if (product_id, review_counts[year][product_id]) in top_products[year]:
+            for word, count in word_count.items():
+                print(f"{year}-{product_id}\t{word}\t{count}")

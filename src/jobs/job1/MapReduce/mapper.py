@@ -1,21 +1,40 @@
 #!/usr/bin/env python
-
+"""mapper.py"""
+import string
 import sys
 import re
 import time
+import csv
+from datetime import datetime
 
+CLEANR = re.compile('<.*?>')
+
+
+def cleanhtml(raw_html):
+    return re.sub(CLEANR, ' ', raw_html)
+
+
+# read line from standard input
 for line in sys.stdin:
-    # Rimuovi spazi bianchi iniziali e finali
+
+    # removing leading/trailing whitespaces
     line = line.strip()
 
-    # Dividi la riga in campi
-    fields = line.split(',')
+    # split the current line into words
+    product_id, time, text = line.split("\t")
 
-    # Estrai campi rilevanti
-    product_id, unix_time, text = fields[1], int(fields[7]), fields[9]
+    # get year
+    year = datetime.utcfromtimestamp(int(time)).strftime('%Y')
+    # remove html tag inside text
+    text = cleanhtml(text)
+    # replace dot with withespace
+    text = text.replace(".", " ")
 
-    # Converti il timestamp in anno
-    year = time.strftime('%Y', time.gmtime(unix_time))
+    # remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    # remove withespace
+    text = re.sub(' +', ' ', text)
+    text = text.strip()
 
     # Estrai parole dal campo "Text" delle recensioni
     words = re.findall(r'\w{4,}', text.lower())
