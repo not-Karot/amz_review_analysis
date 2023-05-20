@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS result_table (
     user_id STRING,
     avg_utility DOUBLE);
 
-INSERT OVERWRITE TABLE result_table
+INSERT OVERWRITE DIRECTORY "${OUTPUT}"
 SELECT
     user_id,
     AVG(CASE

@@ -1,35 +1,37 @@
-DROP TABLE input_docs;
-DROP TABLE intermediate_table;
-DROP TABLE result_table;
+DROP TABLE IF EXISTS input_docs;
+DROP TABLE IF EXISTS intermediate_table;
+DROP TABLE IF EXISTS result_table;
 
 CREATE TABLE input_docs (
     product_id STRING,
-    time INT,
+    event_time INT,
     text STRING)
 ROW FORMAT DELIMITED
-FIELDS TERMINATED BY '\t';
+FIELDS TERMINATED BY '\t'
+LINES TERMINATED BY '\n'
+LOCATION "${INPUT}";
 
-LOAD DATA LOCAL INPATH '/Users/gianlucadilorenzo/Desktop/Universita/ProgettoBigData/amz_review_analysis/src/input/reviews_job1_dim_1.csv'
-    OVERWRITE INTO TABLE input_docs;
-
-ADD FILE hdfs:///user/gianlucadilorenzo/udf.py;
+ADD FILE "${UDF}";
 
 
 CREATE TABLE intermediate_table AS
-    SELECT TRANSFORM(input_docs.product_id, input_docs.time, input_docs.text)
+    SELECT TRANSFORM(input_docs.product_id, input_docs.event_time, input_docs.text)
         USING 'python3 udf.py' AS product_id, year, word
     FROM input_docs;
 
 CREATE TABLE result_table AS
     SELECT product_id, FROM_UNIXTIME(year, 'yyyy') AS year, word, COUNT(*) as count
     FROM intermediate_table
-    GROUP BY product_id, year, word;
+    GROUP BY year, product_id
+    ORDER BY count DESC
+    LIMIT 10;
 
-SELECT * FROM result_table
+INSERT OVERWRITE DIRECTORY "${OUTPUT}"
+SELECT year, product_id, word, count(*) FROM result_table
+         GROUP BY year, product_id, word
          ORDER BY
-        year,
-        product_id,
-        count DESC;
+        count DESC
+        LIMIT 5;
 
 DROP TABLE input_docs;
 DROP TABLE intermediate_table;
