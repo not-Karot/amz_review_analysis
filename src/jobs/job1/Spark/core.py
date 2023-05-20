@@ -1,8 +1,16 @@
+import glob
+from pathlib import Path
+
 import pandas as pd
 from pyspark.sql import SparkSession, Window
 from pyspark.sql.functions import col, year, desc, split, explode, lower, length, count, row_number
+folder_path = './input'
 
-from src.utils import read_job_files
+def read_job_files(job_number: str):
+    folder = Path(folder_path)
+    job_files = glob.glob(str(folder / f'*{job_number}*'))
+    return job_files
+
 
 # Inizializza la Spark session
 spark = SparkSession.builder \
