@@ -17,7 +17,7 @@ for line in sys.stdin:
 
     # removing leading/trailing whitespaces
     line = line.strip()
-
+    fields = line.split("\t")
     # split the current line into words
     product_id, time, text = line.split("\t")
 
