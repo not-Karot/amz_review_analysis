@@ -1,7 +1,7 @@
 import argparse
 import time
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, split, udf
+from pyspark.sql.functions import col, udf
 from pyspark.sql.types import FloatType
 
 # Initialize SparkSQL Session
