@@ -45,4 +45,7 @@ for user_group in user_groups:
     if len(user_group) > 2:
         common_products = set.intersection(*(user_product[user] for user in user_group))
         if len(common_products) >= 3:
-            print('%s\t%s' % (','.join(sorted(user_group)), ','.join(sorted(common_products))))
+            print(
+                "%s\t%s"
+                % (",".join(sorted(user_group)), ",".join(sorted(common_products)))
+            )

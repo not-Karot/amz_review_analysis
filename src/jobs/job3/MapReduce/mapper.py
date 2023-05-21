@@ -16,6 +16,6 @@ for line in sys.stdin:
         score = int(score)
 
         if score >= 4:
-            print('%s\t%s' % (userId, productId))
+            print("%s\t%s" % (userId, productId))
     except ValueError:
         continue
