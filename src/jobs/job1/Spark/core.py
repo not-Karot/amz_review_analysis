@@ -16,9 +16,9 @@ parser.add_argument("--output-path", type=str, help="Output file path")
 args = parser.parse_args()
 input_filepath, output_filepath = args.input_path, args.output_path
 
-# Initialize SparkContext with the proper configuration
+# Inizializza SparkContext
 sc = SparkContext(appName="Amazon Review Analysis")
-start_time = time.time()   # Ottieni il tempo di inizio
+start_time = time.time()
 
 def clean_text(text):
     # Replace punctuation with spaces

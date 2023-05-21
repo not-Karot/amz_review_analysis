@@ -1,64 +1,56 @@
-import glob
-from pathlib import Path
-from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import year, split, explode, lower, length, desc, row_number
+#!/usr/bin/env python3
+"""spark application"""
+import argparse
+import string
+import time
+from datetime import datetime
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import split, explode, length, year, from_unixtime, col, count, row_number
+from pyspark.sql.window import Window
+from pyspark.sql.functions import translate, lower
+import string
+punctuation = string.punctuation
 
-folder_path = './input'
+# create parser and set its arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("--input-path", type=str, help="Input file path")
+parser.add_argument("--output-path", type=str, help="Output file path")
 
+# parse arguments
+args = parser.parse_args()
+input_filepath, output_filepath = args.input_path, args.output_path
 
-def read_job_files(job_number: str):
-    folder = Path(folder_path)
-    job_files = glob.glob(str(folder / f'*{job_number}*'))
-    return job_files
+spark = SparkSession.builder.appName("Amazon Review Analysis").getOrCreate()
+start_time = time.time()
 
+df = spark.read.option("delimiter", "\t").csv(input_filepath).toDF("ProductId", "Time", "Text")
 
-spark = SparkSession.builder \
-    .appName("Amazon Review Analysis - Job 1") \
-    .getOrCreate()
+# pulizia del testo e conversione in minuscolo
+df = df.withColumn("Text", translate(df.Text, punctuation, ' ' * len(punctuation)))
+df = df.withColumn("Text", lower(df.Text))
 
-paths = read_job_files('job1')
-for path in paths:
-    if path.endswith(".csv"):
-        df = spark.read.csv(path, header=True, sep="\t")
-        df = df.withColumn("Year", year(df.Time))
+# Splitting the text into words
+df = df.withColumn("Text", split(df.Text, ' '))
 
+df = df.withColumn("Time", from_unixtime(df.Time).cast("timestamp"))
+df = df.withColumn("Year", year(df.Time))
 
-        df.createOrReplaceTempView("reviews")
+df = df.withColumn("Text", explode(df.Text))
 
+df = df.where(length(df.Text) >= 4)
 
-        top_products_per_year = spark.sql(
-            """
-            SELECT Year, ProductId, COUNT(*) as TotalReviews 
-            FROM reviews 
-            GROUP BY Year, ProductId  
-            ORDER BY Year, TotalReviews DESC
-            LIMIT 10
-            """
-        )
+word_counts = df.groupBy("Year", "ProductId", "Text").count().withColumnRenamed('count', 'word_count')
 
-        words_df = spark.sql(
-            """
-            SELECT Year, ProductId, explode(split(lower(Text), '\\W+')) as Word 
-            FROM reviews 
-            WHERE length(Word) >= 4
-            """
-        )
+review_counts = df.groupBy("Year", "ProductId").count().withColumnRenamed('count', 'review_count')
 
-        words_df.createOrReplaceTempView("words")
+window = Window.partitionBy(review_counts['Year']).orderBy(review_counts['review_count'].desc())
+top_products = review_counts.select('*', row_number().over(window).alias('prod_rank')).filter(col('prod_rank') <= 10)
 
-        word_counts = spark.sql(
-            """
-            SELECT Year, ProductId, Word, COUNT(*) as Occurrences 
-            FROM words 
-            GROUP BY Year, ProductId, Word
-            """
-        )
+joined = word_counts.join(top_products, ["Year", "ProductId"])
 
-        window_spec = Window.partitionBy(word_counts.Year, word_counts.ProductId).orderBy(desc(word_counts.Occurrences))
-        top_words_per_product = word_counts.withColumn("Rank", row_number().over(window_spec)).filter("Rank <= 5").drop("Rank")
+window2 = Window.partitionBy(joined['Year'], joined['ProductId']).orderBy(joined['word_count'].desc())
+top_words = joined.select('*', row_number().over(window2).alias('word_rank')).filter(col('word_rank') <= 5)
 
-        final_result = top_products_per_year.join(top_words_per_product, ["Year", "ProductId"]).orderBy("Year", desc("TotalReviews"), "ProductId", desc("Occurrences"))
+top_words.write.csv(output_filepath)
 
-        final_result.write.csv("${OUTPUT}")
-
-        spark.stop()
+print("Execution time: {} seconds".format(time.time() - start_time))

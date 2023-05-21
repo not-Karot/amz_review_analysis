@@ -12,29 +12,26 @@ def cleanhtml(raw_html):
     return re.sub(CLEANR, ' ', raw_html)
 
 
-# read line from standard input
 for line in sys.stdin:
 
-    # removing leading/trailing whitespaces
+    # carica la riga in memoria
     line = line.strip()
     fields = line.split("\t")
-    # split the current line into words
+    # separa la riga nei campi richiesti
     product_id, time, text = line.split("\t")
 
-    # get year
+    # converte timestamp in anno
     year = datetime.utcfromtimestamp(int(time)).strftime('%Y')
-    # remove html tag inside text
+    # pulisce il testo dai tag html
     text = cleanhtml(text)
-    # replace dot with whitespace
-    text = text.replace(".", " ")
 
-    # remove punctuation
+    # toglie la punteggiatura e spazi bianchi
+    text = text.replace(".", " ")
     text = text.translate(str.maketrans('', '', string.punctuation))
-    # remove whitespace
     text = re.sub(' +', ' ', text)
     text = text.strip()
 
-    # Estrae parole dal campo "Text" delle recensioni
+    # Estrae parole con length()<=4 dal campo delle recensioni
     words = re.findall(r'\w{4,}', text.lower())
 
     for word in words:
