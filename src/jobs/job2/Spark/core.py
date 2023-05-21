@@ -16,9 +16,6 @@ args = parser.parse_args()
 input_filepath, output_filepath = args.input_path, args.output_path
 
 
-
-
-
 # Calcola utilità
 def calculate_utility(numerator, denominator):
     if int(denominator) == 0:
@@ -38,7 +35,9 @@ data = data.map(lambda line: line.split("\t")).map(
 data = data.map(lambda x: (x[0], x[1], x[2], calculate_utility(x[1], x[2])))
 
 # Calcola utilità media (apprezzamento) per ogni utente
-user_utility_avg = data.map(lambda x: (x[0], x[3])).groupByKey().mapValues(lambda v: sum(v) / len(v))
+user_utility_avg = (
+    data.map(lambda x: (x[0], x[3])).groupByKey().mapValues(lambda v: sum(v) / len(v))
+)
 
 # Ordina gli utenti per apprezzamento in ordine decrescente
 sorted_users = user_utility_avg.sortBy(lambda x: x[1], ascending=False)
