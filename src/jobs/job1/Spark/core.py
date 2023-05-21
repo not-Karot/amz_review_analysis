@@ -1,57 +1,60 @@
-import glob
-import os
-from pathlib import Path
+#!/usr/bin/env python3
+"""spark application"""
+import argparse
+import string
+import time
+from datetime import datetime
 
-import pandas as pd
-from pyspark.sql import SparkSession, Window
-from pyspark.sql.functions import col, year, desc, split, explode, lower, length, count, row_number
+from pyspark import SparkContext
 
-path = '${INPUT}'
+# create parser and set its arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("--input-path", type=str, help="Input file path")
+parser.add_argument("--output-path", type=str, help="Output file path")
+
+# parse arguments
+args = parser.parse_args()
+input_filepath, output_filepath = args.input_path, args.output_path
+
+# Initialize SparkContext with the proper configuration
+sc = SparkContext(appName="Amazon Review Analysis")
+start_time = time.time()   # Ottieni il tempo di inizio
+
+def clean_text(text):
+    # Replace punctuation with spaces
+    text = text.translate(str.maketrans(string.punctuation, ' ' * len(string.punctuation)))
+    # Split the text into words and return
+    return text.lower().split()
+
+# Caricare i dati in un RDD
+data = sc.textFile(input_filepath)
+
+# Estrarre i campi
+data = data.map(lambda line: line.split("\t")).map(lambda fields: (fields[0], int(fields[1]), clean_text(fields[2])))
+
+# Convertire timestamp in anno
+data = data.map(lambda x: (datetime.utcfromtimestamp(x[1]).year, x[0], x[2]))
+
+# Contare le parole con lenght()>=4 per prodotto per anno
+word_counts = data.flatMap(lambda x: [((x[0], x[1], word), 1) for word in x[2] if len(word) >= 4]).reduceByKey(lambda a, b: a + b)
+
+# Contare recensioni per prodotto per anno
+review_counts = data.map(lambda x: ((x[0], x[1]), 1)).reduceByKey(lambda a, b: a + b)
+
+# Ordina e prendi i top10 prodotti per anno
+top_products = review_counts.sortBy(lambda x: (-x[1], x[0])).groupBy(lambda x: x[0][0]).map(lambda x: (x[0], sorted(list(x[1]), key=lambda y: y[1], reverse=True)[:10]))
 
 
+top_products = top_products.flatMap(lambda x: [((x[0], product[0][1]), product[1]) for product in x[1]])
+
+# Prendi le parole solo per i top prodotti
+top_words = word_counts.map(lambda x: ((x[0][0], x[0][1]), (x[0][2], x[1]))).join(top_products).map(lambda x: (x[0], x[1][0]))
+
+# Ordina e prendi le top 5 parole per ogni prodotto e per anno
+top_words = top_words.sortBy(lambda x: (-x[1][1], x[0])).groupBy(lambda x: x[0]).map(lambda x: (x[0], sorted(list(x[1]), key=lambda y: y[1][1], reverse=True)[:5]))
+
+# Salva i risultati su un txt
+top_words.saveAsTextFile(output_filepath)
 
 
-spark = SparkSession.builder \
-    .appName("Amazon Review Analysis - Job 1") \
-    .getOrCreate()
-
-
-if path.endswith(".csv"):
-    df = spark.read.csv(path, header=True, sep="\t")
-
-    # Preprocess the data
-    df = df.withColumn("Year", year(col("Time")))
-
-    # Job 1: Find top 10 products with the most reviews per year
-
-    # Job 1
-    # Trova i 10 prodotti con il maggior numero di recensioni per anno
-    top_products_per_year = df.groupBy("Year", "ProductId") \
-        .count() \
-        .withColumnRenamed("count", "TotalReviews") \
-        .orderBy("Year", desc("TotalReviews")) \
-        .groupBy("Year") \
-        .head(10)
-
-    # Estrai parole dal campo "Text" delle recensioni, pulisci e conta le occorrenze
-    words_df = df.select("Year", "ProductId", "Text") \
-        .withColumn("Words", split(lower(col("Text")), "\\W+")) \
-        .select("Year", "ProductId", explode("Words").alias("Word")) \
-        .filter(length(col("Word")) >= 4) \
-        .groupBy("Year", "ProductId", "Word") \
-        .agg(count("Word").alias("Occurrences"))
-
-    # Trova le top 5 parole per ogni prodotto
-    window_spec = Window.partitionBy("Year", "ProductId").orderBy(desc("Occurrences"))
-    top_words_per_product = words_df.withColumn("Rank", row_number().over(window_spec)) \
-        .filter(col("Rank") <= 5) \
-        .drop("Rank")
-
-    # Unisci i risultati per ottenere i 10 prodotti con il maggior numero di recensioni e le top 5 parole per anno
-    final_result = top_products_per_year.join(top_words_per_product, ["Year", "ProductId"]) \
-        .orderBy("Year", desc("TotalReviews"), "ProductId", desc("Occurrences"))
-
-    # Write DataFrame to CSV file
-    final_result.write.csv("${OUTPUT}")
-
-    spark.stop()
+print("Tempo totale di esecuzione: {} secondi".format(time.time() - start_time))
