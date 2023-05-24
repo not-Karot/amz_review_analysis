@@ -36,3 +36,13 @@ Two different jobs have been designed and implemented for each technology:
 
 2. A job capable of generating a list of users ordered based on their appreciation, where the appreciation of each user is obtained from the average usefulness (ratio between HelpfulnessNumerator and HelpfulnessDenominator) of the reviews they wrote, indicating for each user their appreciation.
 
+### Execution time
+
+#### Job1
+
+![Execution time Job1](public/images/Job1.png)
+
+
+#### Job2
+
+![Execution time Job2](public/images/Job2.png)
